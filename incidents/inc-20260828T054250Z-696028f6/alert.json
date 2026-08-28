@@ -1,0 +1,11 @@
+{
+  "incident_id": "inc-20260828T054250Z-696028f6",
+  "timestamp": "2026-08-28T05:42:50.636507+00:00",
+  "reason": "success rate below 90% for two consecutive 30s windows",
+  "attempts": 107,
+  "succeeded": 93,
+  "declined": 14,
+  "success_rate": 0.8691588785046729,
+  "window_start": "2026-08-28T05:42:19+00:00",
+  "window_end": "2026-08-28T05:42:49+00:00"
+}
