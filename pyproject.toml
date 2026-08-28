@@ -19,7 +19,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["checkout_svc", "payments", "tools", "incident_agents"]
+packages = ["checkout_svc", "payments", "tools", "incident_agents", "verify"]
 
 [tool.mypy]
 python_version = "3.12"

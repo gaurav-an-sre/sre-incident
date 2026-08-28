@@ -15,6 +15,13 @@ TOKENS = (
     "failures",
     "accepted",
     "eligible",
+    "alert",
+    "timeline",
+    "hypotheses",
+    "remediation",
+    "verification",
+    "parent_page_id",
+    "incident_id",
 )
 
 

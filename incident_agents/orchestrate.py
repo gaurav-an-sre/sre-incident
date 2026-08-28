@@ -45,6 +45,8 @@ class DryRunAgent:
         suffix = "_correction" if self.runs > 1 else ""
         if self.role == "adjudicator":
             name = f"adjudicate{suffix}.json"
+        elif self.role == "remediator":
+            name = f"remediator{suffix}.json"
         elif self.runs > 1:
             name = f"{self.role.removeprefix('H-').lower()}_correction.json"
         else:
@@ -114,7 +116,9 @@ class InvestigatorOrchestrator:
             )
         self.dry_run = dry_run
 
-    def _agent_for(self, role: str, hypothesis_id: str) -> Any:
+    def _agent_for(
+        self, role: str, hypothesis_id: str, *, auto_create_pr: bool = False
+    ) -> Any:
         existing_id = self.store.role(role).get("agent_id")
         if existing_id:
             try:
@@ -127,6 +131,7 @@ class InvestigatorOrchestrator:
             self.incident_id,
             hypothesis_id,
             starting_ref=self.starting_ref,
+            auto_create_pr=auto_create_pr,
         )
         agent_id = getattr(agent, "agent_id", getattr(agent, "id", None))
         if agent_id is None:
@@ -135,7 +140,14 @@ class InvestigatorOrchestrator:
             state["agent_id"] = agent_id
         return agent
 
-    def _send(self, role: str, agent: Any, prompt: str) -> str:
+    def _send(
+        self,
+        role: str,
+        agent: Any,
+        prompt: str,
+        *,
+        auto_create_pr: bool = False,
+    ) -> str:
         try:
             run = agent.send(prompt)
         except Exception as error:
@@ -147,6 +159,7 @@ class InvestigatorOrchestrator:
                 self.incident_id,
                 hypothesis.hypothesis_id if hypothesis else "",
                 starting_ref=self.starting_ref,
+                auto_create_pr=auto_create_pr,
             )
             replacement_id = getattr(
                 replacement, "agent_id", getattr(replacement, "id", None)

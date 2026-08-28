@@ -1,0 +1,13 @@
+diff --git a/checkout_svc/gateway.py b/checkout_svc/gateway.py
+index 0000000..0000000 100644
+--- a/checkout_svc/gateway.py
++++ b/checkout_svc/gateway.py
+@@ -10,7 +10,7 @@ def authorize(
+     request: dict[str, Any], reconciliation_total_cents: int
+ ) -> dict[str, Any]:
+     requested = int(request["amount_cents"])
+-    if requested != reconciliation_total_cents:
++    if requested < reconciliation_total_cents:
+         return {
+             "decision": "declined",
+             "reason": "amount_mismatch",

@@ -41,6 +41,7 @@ def run(
     rate: float = 4.0,
     seed: int = 20250214,
     duration: float | None = None,
+    count: int | None = None,
 ) -> None:
     rng = random.Random(seed)
     interval = 1.0 / rate
@@ -48,7 +49,9 @@ def run(
     sent = 0
     succeeded = 0
     with httpx.Client(base_url=url, timeout=10) as client:
-        while deadline is None or time.monotonic() < deadline:
+        while (deadline is None or time.monotonic() < deadline) and (
+            count is None or sent < count
+        ):
             started = time.monotonic()
             response = client.post("/api/checkout", json=build_cart(rng))
             response.raise_for_status()
@@ -68,8 +71,9 @@ def main() -> None:
     parser.add_argument("--rate", type=float, default=4.0)
     parser.add_argument("--seed", type=int, default=20250214)
     parser.add_argument("--duration", type=float)
+    parser.add_argument("--count", type=int)
     args = parser.parse_args()
-    run(args.url, args.rate, args.seed, args.duration)
+    run(args.url, args.rate, args.seed, args.duration, args.count)
 
 
 if __name__ == "__main__":
