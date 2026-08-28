@@ -1,0 +1,1 @@
+"""Independent checkout verification engine."""

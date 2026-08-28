@@ -84,8 +84,7 @@ The investigators run independently, cite only the frozen bundle and
 allowlisted source paths, and write their typed event streams and durable
 state under `out/<incident-id>/`. The citation checker independently verifies
 each excerpt and the adjudicator may accept only a post-validation
-`supported` hypothesis. No remediation, Notion publishing, or verification
-engine is included yet.
+`supported` hypothesis.
 
 The complete fleet can be demonstrated without credentials:
 
@@ -106,13 +105,48 @@ ignored. This makes a frozen, reproducible artifact available to later Cursor
 cloud agents investigating the incident. The live `var/` stream remains
 ignored so a demo run does not dirty the working tree.
 
+## Independent verification and follow-up phases
+
+The verifier runs a candidate with the promotion configuration active and does
+not use an agent's confidence or conclusion as its oracle:
+
+```sh
+make verify
+make verify-wrong-fix
+```
+
+`verify` writes `out/verification.json`. It runs 200 deterministic shopper
+attempts, derives the real-product S2a boundary matrix from the promotion
+threshold, checks the one-cent S2b boundary directly through both pricing
+implementations and the independent reference pricer, compares every quote
+with the authorized and reference amounts, exercises gateway reconciliation,
+and runs another 200-attempt compressed soak. The latter is a bounded
+no-new-declines/no-new-alerts check; it represents a soak test without
+pretending that real elapsed soak time passed.
+
+`make verify-wrong-fix` applies `fixtures/wrong_fix.patch` only to a scratch
+candidate. That plausible gateway change restores apparent recovery while
+silently overcharging qualifying customers, so S3 rejects it even though the
+other recovery signals pass.
+
+After an adjudicated investigation, remediation can be requested with:
+
+```sh
+python -m incident_agents remediate --incident <incident-id> --dry-run
+python -m incident_agents publish --incident <incident-id> --dry-run
+```
+
+Remediation refuses inconclusive adjudications and records the cloud agent's
+claim separately from verification. Publish dry-run renders
+`out/<incident-id>/postmortem.md` from the frozen alert bundle,
+investigation, remediation, and verification artifacts. Live publication
+requires `NOTION_TOKEN` and an explicit `--parent-page`; neither is needed for
+dry-run mode.
+
 ## Quality checks
 
 ```sh
 ruff check .
-mypy checkout_svc tools
+mypy checkout_svc tools payments incident_agents verify
 pytest
 ```
-
-Remediation automation, Notion integration, and the deterministic verification
-engine are later phases.

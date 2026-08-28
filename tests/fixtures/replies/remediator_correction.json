@@ -1,0 +1,15 @@
+{
+  "fixed": true,
+  "claim": "The duplicated shipping arithmetic was removed and the checkout fix is verified locally.",
+  "branch": "cursor/remediation/inc-20260828T054250Z-696028f6",
+  "pr_url": "https://github.com/gaurav-an-sre/sre-incident/pull/999",
+  "root_cause_addressed": "The authorization path now honors the free-shipping promotion.",
+  "files_changed": [
+    "payments/authorize_request.py"
+  ],
+  "regression_test": "test_promo_shipping_matches_quote",
+  "verified_locally": true,
+  "charged_amount_behaviour": "Matches the customer quote.",
+  "risks": [],
+  "not_addressed": []
+}

@@ -41,6 +41,7 @@ class CloudFleet:
         hypothesis_id: str = "",
         *,
         starting_ref: str | None = None,
+        auto_create_pr: bool = False,
     ) -> Any:
         sdk = self._sdk()
         cloud = sdk.CloudAgentOptions(
@@ -50,7 +51,7 @@ class CloudFleet:
                     starting_ref=starting_ref,
                 )
             ],
-            auto_create_pr=False,
+            auto_create_pr=auto_create_pr,
             metadata={
                 "demo": DEMO_TAG,
                 "incident": incident_id,
