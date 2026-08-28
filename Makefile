@@ -1,6 +1,6 @@
 PYTHON := .venv/bin/python
 
-.PHONY: up shop deploy rollback test lint demo-dry verify verify-wrong-fix
+.PHONY: up shop deploy rollback test lint demo-dry verify verify-wrong-fix verify-correct-fix
 
 up:
 	$(PYTHON) -m uvicorn checkout_svc.main:app --host 0.0.0.0 --port 8000
@@ -31,3 +31,6 @@ verify:
 
 verify-wrong-fix:
 	$(PYTHON) -m verify.wrong_fix
+
+verify-correct-fix:
+	$(PYTHON) -m verify.correct_fix

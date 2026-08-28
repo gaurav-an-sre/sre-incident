@@ -39,7 +39,7 @@ def test_reference_pricer_hand_computed_values() -> None:
     }
 
 
-def test_wrong_fix_only_fails_charged_amount_signal(tmp_path: Path) -> None:
+def test_wrong_fix_fails_money_and_reconciliation_signals(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[1]
     candidate = tmp_path / "candidate"
     archive = subprocess.run(
@@ -76,6 +76,43 @@ def test_wrong_fix_only_fails_charged_amount_signal(tmp_path: Path) -> None:
     )
     assert discrepancy["classification"] == "overcharge"
     assert discrepancy["authorized_amount_cents"] == discrepancy["quoted_amount_cents"] + 999
+
+
+def test_correct_fix_passes_all_signals(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1]
+    candidate = tmp_path / "candidate"
+    archive = subprocess.run(
+        ["git", "archive", "HEAD"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    ).stdout
+    archive_path = tmp_path / "candidate.tar"
+    archive_path.write_bytes(archive)
+    candidate.mkdir()
+    subprocess.run(["tar", "-xf", str(archive_path), "-C", str(candidate)], check=True)
+    subprocess.run(
+        ["git", "apply", str(root / "fixtures" / "correct_fix.patch")],
+        cwd=candidate,
+        check=True,
+    )
+    result = run_verification(
+        str(candidate),
+        repo_root=root,
+        output_path=tmp_path / "verification-correct-fix.json",
+    )
+    assert result["verified"] is True
+    assert result["failed_signals"] == []
+    assert all(signal["passed"] for signal in result["signals"])
+    assert [signal["id"] for signal in result["signals"]] == [
+        "S1",
+        "S2a",
+        "S2b",
+        "S3",
+        "S4",
+        "S5",
+        "S6",
+    ]
 
 
 def test_remediation_dry_run_claim_is_persisted(tmp_path: Path) -> None:
@@ -138,8 +175,18 @@ def test_publish_dry_run_is_reviewable_without_notion_credentials(tmp_path: Path
     )
     result = PublishOrchestrator(tmp_path, incident).publish(dry_run=True)
     artifact = Path(result["path"])
+    prompt_artifact = Path(result["prompt_path"])
     assert artifact.exists()
+    assert prompt_artifact.exists()
     assert f"Incident {incident}" in artifact.read_text(encoding="utf-8")
+    rendered = artifact.read_text(encoding="utf-8")
+    assert "```json" not in rendered
+    assert "{" not in rendered
+    assert "| Hypothesis | Verdict | Citations valid | Deciding excerpt |" in rendered
+    assert "## Verification" in rendered
+    prompt = prompt_artifact.read_text(encoding="utf-8")
+    assert "{alert}" not in prompt
+    assert "(dry-run: no parent page)" in prompt
 
 
 def test_postmortem_tokens_render_without_touching_json_braces(tmp_path: Path) -> None:

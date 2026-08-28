@@ -1,0 +1,22 @@
+diff --git a/payments/authorize_request.py b/payments/authorize_request.py
+index 0000000..0000000 100644
+--- a/payments/authorize_request.py
++++ b/payments/authorize_request.py
+@@ -1,3 +1,3 @@
+-"""Build the payment request with an intentionally duplicated calculation."""
++"""Build the payment request from the same pricing rules as the quote."""
+ 
+ from __future__ import annotations
+@@ -19,5 +19,11 @@ def build_authorization_request(
+     tax_rate = Decimal(str(config.get("tax_rate", "0")))
+     tax = int((Decimal(taxable) * tax_rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+-    # Defence in depth: authorize only what this cart's own arithmetic justifies.
+     shipping = int(config.get("shipping_cents", 0))
++    if any(
++        isinstance(promo, dict)
++        and promo.get("type") == "free_shipping"
++        and subtotal >= int(promo.get("min_subtotal_cents", 0))
++        for promo in config.get("promos") or []
++    ):
++        shipping = 0
+     amount = subtotal - discount + tax + shipping
