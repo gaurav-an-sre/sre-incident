@@ -38,12 +38,17 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     ]
 
 
+def _verification_path(repo_root: Path, incident_id: str) -> Path:
+    incident_path = repo_root / "out" / incident_id / "verification.json"
+    return incident_path if incident_path.exists() else repo_root / "out" / "verification.json"
+
+
 def render_postmortem(repo_root: Path, incident_id: str) -> str:
     bundle = repo_root / "incidents" / incident_id
     alert = _read_json(bundle / "alert.json")
     investigation = _read_json(repo_root / "out" / incident_id / "investigation.json")
     remediation_path = repo_root / "out" / incident_id / "remediation.json"
-    verification_path = repo_root / "out" / incident_id / "verification.json"
+    verification_path = _verification_path(repo_root, incident_id)
     remediation = _read_json(remediation_path) if remediation_path.exists() else None
     verification = _read_json(verification_path) if verification_path.exists() else None
     decision = investigation.get("adjudication", {}).get("decision")
@@ -120,7 +125,7 @@ class PublishOrchestrator(InvestigatorOrchestrator):
         bundle = self.repo_root / "incidents" / self.incident_id
         alert = _read_json(bundle / "alert.json")
         remediation_path = self.repo_root / "out" / self.incident_id / "remediation.json"
-        verification_path = self.repo_root / "out" / self.incident_id / "verification.json"
+        verification_path = _verification_path(self.repo_root, self.incident_id)
         remediation = _read_json(remediation_path) if remediation_path.exists() else {}
         verification = _read_json(verification_path) if verification_path.exists() else {}
         prompt = render_prompt(

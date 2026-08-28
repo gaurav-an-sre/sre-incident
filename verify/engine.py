@@ -173,7 +173,9 @@ def _claim_matches(claim: str | None, verified: bool) -> bool:
     says_success = (
         '"fixed": true' in lowered
         or "verified: true" in lowered
-        or ("success" in lowered and "fixed" in lowered)
+        or "verified locally" in lowered
+        or ("fixed" in lowered and "not fixed" not in lowered)
+        or ("success" in lowered and "failure" not in lowered)
     )
     return says_success == verified
 
