@@ -1,0 +1,22 @@
+{
+  "hypothesis_id": "H-CAPACITY",
+  "verdict": "rejected",
+  "confidence": 0.88,
+  "root_cause": null,
+  "failure_discriminator": "The failures follow cart eligibility rather than load.",
+  "evidence": [
+    {
+      "file": "incidents/inc-20260828T054250Z-696028f6/metrics.jsonl",
+      "excerpt": "\"attempts\": 4, \"declined\": 0",
+      "why": "Healthy traffic has ordinary low latency and no declines."
+    },
+    {
+      "file": "payments/authorize_request.py",
+      "excerpt": "shipping = int(config.get(\"shipping_cents\", 0))",
+      "why": "The authorization path has a deterministic amount calculation."
+    }
+  ],
+  "falsification_attempted": "A saturation event would correlate with latency and affect all carts, which did not occur.",
+  "recommended_action": null,
+  "notes": []
+}

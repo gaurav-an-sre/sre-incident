@@ -67,6 +67,7 @@ class Watchdog:
             summary, _end = window
             if summary["success_rate"] >= self.threshold:
                 self.bad_windows = 0
+                self._alerted = False
                 return None
             self.bad_windows += 1
             if self.bad_windows < 2 or self._alerted:

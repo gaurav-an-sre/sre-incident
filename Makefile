@@ -1,6 +1,6 @@
 PYTHON := .venv/bin/python
 
-.PHONY: up shop deploy rollback test lint
+.PHONY: up shop deploy rollback test lint demo-dry
 
 up:
 	$(PYTHON) -m uvicorn checkout_svc.main:app --host 0.0.0.0 --port 8000
@@ -20,3 +20,6 @@ test:
 lint:
 	$(PYTHON) -m ruff check .
 	$(PYTHON) -m mypy checkout_svc tools
+
+demo-dry:
+	$(PYTHON) -m incident_agents investigate --incident inc-20260828T054250Z-696028f6 --dry-run --fresh

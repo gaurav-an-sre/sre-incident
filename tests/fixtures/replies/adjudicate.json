@@ -1,0 +1,10 @@
+{
+  "accepted_hypothesis": "H-DEPENDENCY",
+  "root_cause": "The payment provider caused checkout failures.",
+  "customer_impact": "Some customers could not pay.",
+  "failure_discriminator": "Large carts declined.",
+  "rejected": [],
+  "confidence": 0.9,
+  "unresolved_questions": [],
+  "recommended_fix": "Investigate the provider."
+}

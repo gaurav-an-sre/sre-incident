@@ -15,21 +15,13 @@ from checkout_svc.paths import config_dir
 def deploy(mode: str) -> str:
     config = config_dir()
     live = config / "pricing.yaml"
-    target = config / ("pricing.promo.yaml" if mode == "promo" else "pricing.yaml")
-    if mode == "rollback":
-        target = config / "pricing.healthy.yaml"
-        if not target.exists():
-            target = config / "pricing.baseline.yaml"
-        if not target.exists():
-            raise FileNotFoundError("rollback needs config/pricing.healthy.yaml")
-    before = live.read_text(encoding="utf-8")
-    after = target.read_text(encoding="utf-8")
     if mode not in {"promo", "rollback"}:
         raise ValueError("mode must be promo or rollback")
-    if mode == "promo":
-        healthy_copy = config / "pricing.healthy.yaml"
-        if not healthy_copy.exists():
-            shutil.copyfile(live, healthy_copy)
+    target = config / ("pricing.promo.yaml" if mode == "promo" else "pricing.baseline.yaml")
+    if not target.exists():
+        raise FileNotFoundError(f"missing deployment config: {target}")
+    before = live.read_text(encoding="utf-8")
+    after = target.read_text(encoding="utf-8")
     shutil.copyfile(target, live)
     diff = "".join(
         difflib.unified_diff(

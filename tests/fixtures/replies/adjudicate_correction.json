@@ -1,0 +1,20 @@
+{
+  "accepted_hypothesis": "H-CHANGE",
+  "root_cause": "The free-shipping configuration changed the customer quote while the authorization path continued to add flat shipping, producing a 999-cent mismatch for qualifying carts.",
+  "customer_impact": "Qualifying checkout attempts declined as amount mismatches while smaller carts succeeded.",
+  "failure_discriminator": "Carts at or above the free-shipping threshold declined; smaller carts succeeded.",
+  "rejected": [
+    {
+      "hypothesis_id": "H-DEPENDENCY",
+      "why_rejected": "The provider returned prompt business decisions."
+    },
+    {
+      "hypothesis_id": "H-CAPACITY",
+      "why_rejected": "Failures followed cart eligibility rather than latency or load."
+    }
+  ],
+  "confidence": 0.98,
+  "unresolved_questions": [],
+  "recommended_fix": "Unify the quote and authorization amount calculation.",
+  "must_not_do": ["Suppress amount reconciliation or disable the promotion."]
+}

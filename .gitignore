@@ -5,6 +5,6 @@ __pycache__/
 .ruff_cache/
 *.py[cod]
 *.egg-info/
+out/
 var/*
 !var/.gitkeep
-config/pricing.healthy.yaml

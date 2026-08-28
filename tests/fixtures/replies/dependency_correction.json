@@ -1,0 +1,22 @@
+{
+  "hypothesis_id": "H-DEPENDENCY",
+  "verdict": "rejected",
+  "confidence": 0.91,
+  "root_cause": null,
+  "provider_behaviour": "The provider answered promptly and returned amount mismatch as a normal business decision.",
+  "evidence": [
+    {
+      "file": "incidents/inc-20260828T054250Z-696028f6/payments.jsonl",
+      "excerpt": "amount_mismatch",
+      "why": "The provider records a business decline reason."
+    },
+    {
+      "file": "incidents/inc-20260828T054250Z-696028f6/metrics.jsonl",
+      "excerpt": "\"p95_latency_ms\": 3.86",
+      "why": "Latency stayed low during the incident."
+    }
+  ],
+  "falsification_attempted": "No timeout, transport error, or elevated latency appears in the frozen record.",
+  "recommended_action": null,
+  "notes": []
+}

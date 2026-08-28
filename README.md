@@ -65,8 +65,33 @@ gitignored:
   `change_description`, and the unified config `diff`.
 * `alerts.jsonl`: watchdog alert metadata, including the incident window.
 
-These schemas are intentionally stable read-only inputs for the later
-investigation agents, which are not part of phase 1.
+These schemas are intentionally stable read-only inputs for the investigation
+agents.
+
+## Offline investigation fleet
+
+Phase 2 wires three independent Cursor cloud hypothesis investigators and a
+cloud adjudicator. A live run requires `CURSOR_API_KEY`:
+
+```sh
+python -m incident_agents investigate --incident <incident-id> \
+  --starting-ref main
+python -m incident_agents status --incident <incident-id>
+python -m incident_agents agents
+```
+
+The investigators run independently, cite only the frozen bundle and
+allowlisted source paths, and write their typed event streams and durable
+state under `out/<incident-id>/`. The citation checker independently verifies
+each excerpt and the adjudicator may accept only a post-validation
+`supported` hypothesis. No remediation, Notion publishing, or verification
+engine is included yet.
+
+The complete fleet can be demonstrated without credentials:
+
+```sh
+make demo-dry
+```
 
 ## Incident bundles
 
@@ -89,5 +114,5 @@ mypy checkout_svc tools
 pytest
 ```
 
-No Cursor SDK agents, remediation automation, Notion integration, or
-deterministic verification engine is included yet; those are later phases.
+Remediation automation, Notion integration, and the deterministic verification
+engine are later phases.

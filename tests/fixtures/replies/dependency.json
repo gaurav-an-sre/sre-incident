@@ -1,0 +1,22 @@
+{
+  "hypothesis_id": "H-DEPENDENCY",
+  "verdict": "rejected",
+  "confidence": 0.91,
+  "root_cause": null,
+  "provider_behaviour": "The simulated provider answered promptly with structured business declines rather than timing out or returning errors.",
+  "evidence": [
+    {
+      "file": "incidents/inc-20260828T054250Z-696028f6/payments.jsonl",
+      "excerpt": "amount_mismatch",
+      "why": "The provider records a business reason, not an outage."
+    },
+    {
+      "file": "checkout_svc/gateway.py",
+      "excerpt": "provider was completely offline",
+      "why": "This fabricated citation should be caught by the validator."
+    }
+  ],
+  "falsification_attempted": "An outage would have produced missing responses or transport failures, which are absent.",
+  "recommended_action": null,
+  "notes": ["The second citation is intentionally fabricated for the offline demo."]
+}

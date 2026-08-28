@@ -1,0 +1,22 @@
+{
+  "hypothesis_id": "H-CHANGE",
+  "verdict": "supported",
+  "confidence": 0.98,
+  "root_cause": "The promotion deploy changed the customer quote to free shipping while authorization continued to add flat shipping, so qualifying carts differed by 999 cents.",
+  "failure_discriminator": "Carts at or above the free-shipping threshold declined; smaller carts continued to succeed.",
+  "evidence": [
+    {
+      "file": "incidents/inc-20260828T054250Z-696028f6/deploys.jsonl",
+      "excerpt": "Enable free shipping for orders over $100",
+      "why": "The deploy evidence shows the free-shipping change."
+    },
+    {
+      "file": "checkout_svc/pricing.py",
+      "excerpt": "shipping = 0",
+      "why": "The quote path applies free shipping when the promotion qualifies."
+    }
+  ],
+  "falsification_attempted": "A deploy-independent failure would not align with the config boundary and exact payment difference; the evidence did not show that alternative.",
+  "recommended_action": "Make authorization reconcile against the same quoted total.",
+  "notes": []
+}

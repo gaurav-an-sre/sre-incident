@@ -60,3 +60,38 @@ def test_watchdog_exact_threshold_does_not_alert(tmp_path: Path) -> None:
     watchdog = Watchdog(tmp_path, tmp_path / "incidents")
     assert watchdog.check_once() is None
     assert watchdog.check_once() is None
+
+
+def test_watchdog_rearms_after_genuine_recovery(tmp_path: Path) -> None:
+    now = datetime.now(UTC)
+
+    def add_metric(offset: int, succeeded: int, attempts: int = 10) -> None:
+        timestamp = (now + timedelta(seconds=offset)).isoformat()
+        append_jsonl(
+            "metrics.jsonl",
+            {
+                "timestamp": timestamp,
+                "second": int((now + timedelta(seconds=offset)).timestamp()),
+                "attempts": attempts,
+                "succeeded": succeeded,
+                "declined": attempts - succeeded,
+                "success_rate": succeeded / attempts,
+                "p95_latency_ms": 2.0,
+            },
+            tmp_path,
+        )
+
+    watchdog = Watchdog(tmp_path, tmp_path / "incidents")
+    add_metric(-29, 8)
+    add_metric(-15, 8)
+    add_metric(-1, 8)
+    assert watchdog.check_once() is None
+    assert watchdog.check_once() is not None
+
+    add_metric(40, 10)
+    assert watchdog.check_once() is None
+
+    add_metric(70, 8)
+    add_metric(80, 8)
+    assert watchdog.check_once() is None
+    assert watchdog.check_once() is not None

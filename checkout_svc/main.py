@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -107,24 +109,22 @@ def _status() -> dict[str, Any]:
     }
 
 
-app = FastAPI(title="Storefront Incident Demo")
-
-
-@app.on_event("startup")
-def startup() -> None:
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     global watchdog_thread
     db.initialize()
     watchdog_thread = WatchdogThread(Watchdog())
     watchdog_thread.start()
+    try:
+        yield
+    finally:
+        if watchdog_thread is not None:
+            watchdog_thread.stop()
+            watchdog_thread = None
+        metrics.flush()
 
 
-@app.on_event("shutdown")
-def shutdown() -> None:
-    global watchdog_thread
-    metrics.flush()
-    if watchdog_thread is not None:
-        watchdog_thread.stop()
-        watchdog_thread = None
+app = FastAPI(title="Storefront Incident Demo", lifespan=lifespan)
 
 
 @app.get("/", response_class=HTMLResponse)
