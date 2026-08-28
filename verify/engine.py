@@ -90,7 +90,7 @@ def _materialize(repo_root: Path, candidate_ref: str, destination: Path) -> None
         capture_output=True,
     ).stdout
     with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as bundle:
-        bundle.extractall(destination)
+        bundle.extractall(destination, filter="data")
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:

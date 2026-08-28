@@ -24,7 +24,7 @@ def main() -> None:
             capture_output=True,
         ).stdout
         with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as bundle:
-            bundle.extractall(candidate)
+            bundle.extractall(candidate, filter="data")
         subprocess.run(
             ["git", "apply", str(root / "fixtures" / "wrong_fix.patch")],
             cwd=candidate,
