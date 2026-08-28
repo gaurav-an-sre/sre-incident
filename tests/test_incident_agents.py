@@ -1,7 +1,10 @@
 import json
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from incident_agents.orchestrate import InvestigatorOrchestrator
 from incident_agents.prompts import render_prompt
@@ -290,12 +293,12 @@ def test_agent_recreation_after_typed_not_found(tmp_path: Path) -> None:
     orchestrator = InvestigatorOrchestrator(
         tmp_path, "inc-1", starting_ref="branch", fleet=fleet, fresh=True
     )
-    role = orchestrator.store.role("H-CHANGE")
-    role["agent_id"] = "old-agent"
+    with orchestrator.store.update_role("H-CHANGE") as role:
+        role["agent_id"] = "old-agent"
     agent = orchestrator._agent_for("H-CHANGE", "H-CHANGE")
     assert agent.agent_id == "new-agent"
     assert fleet.created[0][3]["starting_ref"] == "branch"
-    assert role["agent_id"] == "new-agent"
+    assert orchestrator.store.role("H-CHANGE")["agent_id"] == "new-agent"
 
 
 def test_existing_agent_is_resumed_without_recreation(tmp_path: Path) -> None:
@@ -319,11 +322,87 @@ def test_existing_agent_is_resumed_without_recreation(tmp_path: Path) -> None:
     orchestrator = InvestigatorOrchestrator(
         tmp_path, "inc-1", fleet=fleet, fresh=True
     )
-    role = orchestrator.store.role("H-CHANGE")
-    role["agent_id"] = "existing-agent"
+    with orchestrator.store.update_role("H-CHANGE") as role:
+        role["agent_id"] = "existing-agent"
     assert orchestrator._agent_for("H-CHANGE", "H-CHANGE").agent_id == "existing-agent"
     assert fleet.resumed == ["existing-agent"]
     assert fleet.created == 0
+
+
+def test_state_updates_are_atomic_and_none_are_lost(tmp_path: Path) -> None:
+    from incident_agents.state import StateStore
+
+    store = StateStore(tmp_path, "inc-1", fresh=True)
+    failures: list[Exception] = []
+    start = threading.Barrier(8)
+
+    def worker(index: int) -> None:
+        try:
+            start.wait()
+            for update in range(20):
+                with store.update_role("shared") as role:
+                    role.setdefault("updates", {})[f"{index}-{update}"] = True
+        except Exception as error:
+            failures.append(error)
+
+    threads = [threading.Thread(target=worker, args=(index,)) for index in range(8)]
+    for thread in threads:
+        thread.start()
+    while any(thread.is_alive() for thread in threads):
+        if store.path.exists():
+            json.loads(store.path.read_text(encoding="utf-8"))
+    for thread in threads:
+        thread.join()
+    assert failures == []
+    saved = json.loads(store.path.read_text(encoding="utf-8"))
+    assert len(saved["roles"]["shared"]["updates"]) == 160
+
+
+@pytest.mark.parametrize("has_eligible_hypothesis", [False, True])
+def test_explicit_null_adjudication_is_terminal(
+    tmp_path: Path, has_eligible_hypothesis: bool
+) -> None:
+    class Agent:
+        agent_id = "adj-agent"
+
+        def __init__(self):
+            self.calls = 0
+
+        def send(self, _prompt):
+            self.calls += 1
+            reply = json.dumps({"accepted_hypothesis": None, "unresolved_questions": []})
+            return SimpleNamespace(
+                stream=lambda: iter([{"type": "assistant", "message": reply}]),
+                wait=lambda: SimpleNamespace(result=reply, run_id=f"adj-{self.calls}"),
+            )
+
+    class Fleet:
+        def __init__(self):
+            self.agent = Agent()
+
+        def create_agent(self, *_args, **_kwargs):
+            return self.agent
+
+        def resume_agent(self, _agent_id):
+            return self.agent
+
+        def is_agent_not_found(self, _error):
+            return False
+
+    fleet = Fleet()
+    orchestrator = InvestigatorOrchestrator(tmp_path, "inc-1", fresh=True, fleet=fleet)
+    reports = {
+        "H-CHANGE": {
+            "hypothesis_id": "H-CHANGE",
+            "verdict": "supported" if has_eligible_hypothesis else "rejected",
+        },
+        "H-DEPENDENCY": {"hypothesis_id": "H-DEPENDENCY", "verdict": "inconclusive"},
+        "H-CAPACITY": {"hypothesis_id": "H-CAPACITY", "verdict": "rejected"},
+    }
+    result = orchestrator._adjudicate(reports)
+    assert result["decision"]["accepted_hypothesis"] is None
+    assert "adjudication_invalid" not in result["decision"]
+    assert fleet.agent.calls == 1
 
 
 def test_adjudicator_cannot_retain_ineligible_choice(tmp_path: Path) -> None:
@@ -358,3 +437,50 @@ def test_adjudicator_cannot_retain_ineligible_choice(tmp_path: Path) -> None:
     result = orchestrator._adjudicate(reports)
     assert result["decision"]["accepted_hypothesis"] is None
     assert result["decision"]["adjudication_invalid"] is True
+
+
+def test_adjudication_correction_uses_owned_prompt_file(tmp_path: Path) -> None:
+    class Agent:
+        agent_id = "adj-agent"
+
+        def __init__(self):
+            self.prompts: list[str] = []
+
+        def send(self, prompt):
+            self.prompts.append(prompt)
+            accepted = "H-DEPENDENCY" if len(self.prompts) == 1 else "H-CHANGE"
+            reply = json.dumps({"accepted_hypothesis": accepted})
+            return SimpleNamespace(
+                stream=lambda: iter([{"type": "assistant", "message": reply}]),
+                wait=lambda: SimpleNamespace(
+                    result=reply, run_id=f"adj-run-{len(self.prompts)}"
+                ),
+            )
+
+    class Fleet:
+        def __init__(self):
+            self.agent = Agent()
+
+        def create_agent(self, *_args, **_kwargs):
+            return self.agent
+
+        def resume_agent(self, _agent_id):
+            return self.agent
+
+        def is_agent_not_found(self, _error):
+            return False
+
+    fleet = Fleet()
+    orchestrator = InvestigatorOrchestrator(tmp_path, "inc-1", fresh=True, fleet=fleet)
+    reports = {
+        "H-CHANGE": {"hypothesis_id": "H-CHANGE", "verdict": "supported"},
+        "H-DEPENDENCY": {"hypothesis_id": "H-DEPENDENCY", "verdict": "rejected"},
+        "H-CAPACITY": {"hypothesis_id": "H-CAPACITY", "verdict": "rejected"},
+    }
+    result = orchestrator._adjudicate(reports)
+    assert result["decision"]["accepted_hypothesis"] == "H-CHANGE"
+    assert "Your decision was rejected." in fleet.agent.prompts[1]
+    assert 'You accepted `"H-DEPENDENCY"`' in fleet.agent.prompts[1]
+    assert "Eligible now: H-CHANGE: post-validation verdict supported" in fleet.agent.prompts[1]
+    assert "{accepted}" not in fleet.agent.prompts[1]
+    assert "{eligible}" not in fleet.agent.prompts[1]

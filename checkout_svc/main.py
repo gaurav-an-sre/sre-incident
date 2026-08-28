@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
@@ -103,8 +103,14 @@ def _status() -> dict[str, Any]:
         "succeeded_last_60s": succeeded,
         "declined_last_60s": declined,
         "attempts_last_60s": attempts,
-        "success_rate": succeeded / attempts if attempts else 1.0,
-        "state": "GREEN" if not attempts or succeeded / attempts >= 0.90 else "RED",
+        "success_rate": succeeded / attempts if attempts else None,
+        "state": (
+            "NO_TRAFFIC"
+            if not attempts
+            else "GREEN"
+            if succeeded / attempts >= 0.90
+            else "RED"
+        ),
         "buckets": buckets,
     }
 
@@ -139,6 +145,11 @@ def storefront(request: Request) -> HTMLResponse:
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/favicon.ico")
+def favicon() -> Response:
+    return Response(content=b"", media_type="image/x-icon")
 
 
 @app.get("/api/products")

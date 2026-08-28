@@ -7,7 +7,7 @@ import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from .config import DEFAULT_STARTING_REF, HYPOTHESIS_ROLES
 from .prompts import render_prompt
@@ -115,10 +115,10 @@ class InvestigatorOrchestrator:
         self.dry_run = dry_run
 
     def _agent_for(self, role: str, hypothesis_id: str) -> Any:
-        state = self.store.role(role)
-        if state["agent_id"]:
+        existing_id = self.store.role(role).get("agent_id")
+        if existing_id:
             try:
-                return self.fleet.resume_agent(state["agent_id"])
+                return self.fleet.resume_agent(existing_id)
             except Exception as error:
                 if not self.fleet.is_agent_not_found(error):
                     raise
@@ -128,14 +128,14 @@ class InvestigatorOrchestrator:
             hypothesis_id,
             starting_ref=self.starting_ref,
         )
-        state["agent_id"] = getattr(agent, "agent_id", getattr(agent, "id", None))
-        if state["agent_id"] is None:
+        agent_id = getattr(agent, "agent_id", getattr(agent, "id", None))
+        if agent_id is None:
             raise RuntimeError(f"{role} agent has no id")
-        self.store.save()
+        with self.store.update_role(role) as state:
+            state["agent_id"] = agent_id
         return agent
 
     def _send(self, role: str, agent: Any, prompt: str) -> str:
-        state = self.store.role(role)
         try:
             run = agent.send(prompt)
         except Exception as error:
@@ -148,14 +148,19 @@ class InvestigatorOrchestrator:
                 hypothesis.hypothesis_id if hypothesis else "",
                 starting_ref=self.starting_ref,
             )
-            state["agent_id"] = getattr(replacement, "agent_id", getattr(replacement, "id", None))
-            self.store.save()
+            replacement_id = getattr(
+                replacement, "agent_id", getattr(replacement, "id", None)
+            )
+            if replacement_id is None:
+                raise RuntimeError(f"{role} replacement agent has no id") from error
+            with self.store.update_role(role) as state:
+                state["agent_id"] = replacement_id
             run = replacement.send(prompt)
         run_result = stream_run(run, self.out_dir / f"{role}.jsonl")
-        state.setdefault("run_ids", []).append(
-            getattr(run_result, "run_id", getattr(run_result, "id", None))
-        )
-        self.store.save()
+        with self.store.update_role(role) as state:
+            state.setdefault("run_ids", []).append(
+                getattr(run_result, "run_id", getattr(run_result, "id", None))
+            )
         return str(getattr(run_result, "result", ""))
 
     def _investigate_role(self, role: str, details: Any) -> None:
@@ -168,8 +173,8 @@ class InvestigatorOrchestrator:
             details.prompt_file,
             {"preamble": preamble, "bundle_dir": f"incidents/{self.incident_id}"},
         )
-        state["status"] = "investigating"
-        self.store.save()
+        with self.store.update_role(role) as state:
+            state["status"] = "investigating"
         text = self._send(role, agent, prompt)
         try:
             report = parse_report(text)
@@ -196,15 +201,15 @@ class InvestigatorOrchestrator:
                 report["validation"]["reason"] = "citation correction reply was invalid"
                 report["verdict"] = "inconclusive"
                 report["validation"]["correction_attempt"] = first_validation
-        state["report"] = report
-        state["validation"] = report.get("validation")
-        state["status"] = "validated"
-        self.store.save()
+        with self.store.update_role(role) as state:
+            state["report"] = report
+            state["validation"] = report.get("validation")
+            state["status"] = "validated"
 
     def _adjudicate(self, reports: dict[str, dict[str, Any]]) -> dict[str, Any]:
-        state = self.store.data.get("adjudication")
+        state = self.store.adjudication()
         if state:
-            return cast(dict[str, Any], state)
+            return state
         agent = self._agent_for("adjudicator", "")
         rendered = render_prompt(
             "adjudicate.md",
@@ -217,18 +222,26 @@ class InvestigatorOrchestrator:
             hypothesis_id = report.get("hypothesis_id")
             if report.get("verdict") == "supported" and isinstance(hypothesis_id, str):
                 eligible.add(hypothesis_id)
-        if decision.get("accepted_hypothesis") not in eligible:
+        accepted = decision.get("accepted_hypothesis")
+        if "accepted_hypothesis" not in decision or (
+            accepted is not None and accepted not in eligible
+        ):
             eligibility = ", ".join(
                 f"{hypothesis}: post-validation verdict supported"
                 for hypothesis in sorted(eligible)
             ) or "none"
-            correction = (
-                "Your accepted_hypothesis is ineligible. Reply with the full JSON decision again. "
-                f"Eligible hypotheses are {eligibility}. Every other hypothesis is ineligible "
-                "because its post-validation verdict is not supported."
+            correction = render_prompt(
+                "adjudication_correction.md",
+                {
+                    "accepted": json.dumps(accepted),
+                    "eligible": eligibility,
+                },
             )
             corrected = parse_report(self._send("adjudicator", agent, correction))
-            if corrected.get("accepted_hypothesis") not in eligible:
+            corrected_accepted = corrected.get("accepted_hypothesis")
+            if "accepted_hypothesis" not in corrected or (
+                corrected_accepted is not None and corrected_accepted not in eligible
+            ):
                 corrected["accepted_hypothesis"] = None
                 corrected["adjudication_invalid"] = True
             decision = corrected
@@ -237,8 +250,7 @@ class InvestigatorOrchestrator:
             "run_ids": self.store.role("adjudicator").get("run_ids", []),
             "decision": decision,
         }
-        self.store.data["adjudication"] = state
-        self.store.save()
+        self.store.set_adjudication(state)
         return dict(state)
 
     def run(self) -> dict[str, Any]:

@@ -32,3 +32,31 @@ def test_checkout_decline_is_http_200_and_health_stays_green(tmp_path: Path, mon
 
     orders = [json.loads(line) for line in (var_dir / "orders.jsonl").read_text().splitlines()]
     assert orders[0]["outcome"] == "declined"
+
+
+def test_status_is_no_traffic_until_first_attempt(tmp_path: Path, monkeypatch) -> None:
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    root = Path(__file__).resolve().parents[1]
+    for name in ("pricing.yaml", "pricing.baseline.yaml"):
+        (config_dir / name).write_text(
+            (root / "config" / name).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    monkeypatch.setenv("CONFIG_DIR", str(config_dir))
+    monkeypatch.setenv("VAR_DIR", str(tmp_path / "var"))
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "store.sqlite3"))
+
+    with TestClient(app) as client:
+        empty = client.get("/api/status").json()
+        assert empty["state"] == "NO_TRAFFIC"
+        assert empty["success_rate"] is None
+        assert all(bucket["success_rate"] is None for bucket in empty["buckets"])
+
+        assert client.get("/favicon.ico").status_code == 200
+        checkout = client.post(
+            "/api/checkout", json={"items": [{"product_id": 1, "quantity": 1}]}
+        )
+        assert checkout.status_code == 200
+        active = client.get("/api/status").json()
+        assert active["state"] == "GREEN"
+        assert active["success_rate"] == 1.0

@@ -9,9 +9,10 @@
     * { box-sizing:border-box; } body { margin:0; color:var(--ink); font-family:Inter,ui-sans-serif,system-ui,sans-serif; background:var(--cream); }
     .status { padding:20px 5vw; color:#fff; display:flex; align-items:center; gap:28px; }
     .status.green { background:var(--green); } .status.red { background:var(--red); }
+    .status.no_traffic { background:#68737d; }
     .state { font-size:clamp(2rem,5vw,4rem); font-weight:900; letter-spacing:.04em; }
-    .metric { font-size:1.15rem; } .metric strong { display:block; font-size:2rem; }
-    main { max-width:1400px; margin:0 auto; padding:32px 5vw; } header { display:flex; justify-content:space-between; align-items:end; gap:24px; }
+    .metric { font-size:1.35rem; font-weight:700; } .metric strong { display:block; font-size:2rem; }
+    main { max-width:1400px; margin:0 auto; padding:20px 5vw; } header { display:flex; justify-content:space-between; align-items:end; gap:24px; }
     h1 { margin:0; font-size:clamp(2rem,4vw,3.5rem); } .subtitle { color:var(--muted); font-size:1.1rem; }
     .layout { display:grid; grid-template-columns:1fr 380px; gap:28px; margin-top:28px; }
     .products { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
@@ -25,8 +26,9 @@
     .total { border-top:2px solid var(--ink); font-size:1.3rem; font-weight:850; padding-top:10px !important; }
     #checkout { width:100%; margin-top:10px; background:#146bd7; font-size:1.15rem; } #result { margin-top:16px; font-weight:700; }
     .success { color:var(--green); } .declined { color:var(--red); }
-    .history { margin-top:28px; background:#fff; border-radius:16px; padding:18px 22px; } .bars { display:flex; align-items:end; gap:5px; height:62px; }
+    .history { margin-top:20px; background:#fff; border-radius:16px; padding:18px 22px; font-size:1.2rem; font-weight:800; } .bars { display:flex; align-items:end; gap:5px; height:70px; margin-top:10px; }
     .bar { flex:1; min-height:5px; border-radius:4px 4px 0 0; background:var(--green); } .bar.bad { background:var(--red); }
+    .bar.empty { height:14px !important; min-height:14px; background:transparent; border:3px solid #9da6ad; }
     @media (max-width:900px) { .layout { grid-template-columns:1fr; } .products { grid-template-columns:repeat(2,minmax(0,1fr)); } .cart { position:static; } }
     @media (max-width:560px) { .products { grid-template-columns:1fr; } .status { flex-wrap:wrap; gap:14px; } }
   </style>
@@ -36,10 +38,11 @@
     <div id="state" class="state">GREEN</div>
     <div class="metric"><strong id="success-count">0</strong> succeeded / 60s</div>
     <div class="metric"><strong id="decline-count">0</strong> declined / 60s</div>
-    <div class="metric"><strong id="success-rate">100%</strong> success rate</div>
+    <div class="metric"><strong id="success-rate">—</strong> success rate</div>
   </section>
   <main>
     <header><div><h1>Northstar Goods</h1><div class="subtitle">Live checkout reliability demonstration</div></div></header>
+    <section class="history"><strong>Success rate by 10-second interval</strong><div id="bars" class="bars"></div></section>
     <div class="layout">
       <section class="products">
         {% for product in products %}
@@ -62,7 +65,6 @@
         <button id="checkout" disabled>Checkout</button><div id="result"></div>
       </aside>
     </div>
-    <section class="history"><strong>Success rate by 10-second interval</strong><div id="bars" class="bars"></div></section>
   </main>
   <script>
     const products = {{ products|tojson }};
@@ -97,13 +99,13 @@
     });
     const refreshStatus = async () => {
       const s = await (await fetch("/api/status")).json();
-      document.querySelector("#state").textContent = s.state;
+      document.querySelector("#state").textContent = s.state === "NO_TRAFFIC" ? "NO TRAFFIC" : s.state;
       document.querySelector("#status").className = "status " + s.state.toLowerCase();
       document.querySelector("#success-count").textContent = s.succeeded_last_60s;
       document.querySelector("#decline-count").textContent = s.declined_last_60s;
-      document.querySelector("#success-rate").textContent = `${(s.success_rate * 100).toFixed(1)}%`;
+      document.querySelector("#success-rate").textContent = s.success_rate === null ? "—" : `${(s.success_rate * 100).toFixed(1)}%`;
       const bars = document.querySelector("#bars"); bars.innerHTML = "";
-      s.buckets.forEach(b => { const bar = document.createElement("div"); bar.className = "bar" + (b.success_rate !== null && b.success_rate < .9 ? " bad" : ""); bar.style.height = `${Math.max(8, (b.success_rate ?? 1) * 100)}%`; bar.title = b.success_rate === null ? "No traffic" : `${(b.success_rate*100).toFixed(0)}%`; bars.appendChild(bar); });
+      s.buckets.forEach(b => { const bar = document.createElement("div"); const empty = b.success_rate === null; bar.className = "bar" + (empty ? " empty" : b.success_rate < .9 ? " bad" : ""); if (!empty) bar.style.height = `${Math.max(8, b.success_rate * 100)}%`; bar.title = empty ? "No traffic" : `${(b.success_rate*100).toFixed(0)}%`; bars.appendChild(bar); });
     };
     renderCart(); refreshStatus(); setInterval(refreshStatus, 1000);
   </script>

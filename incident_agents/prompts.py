@@ -6,7 +6,16 @@ from pathlib import Path
 
 from .config import PROMPTS_DIR
 
-TOKENS = ("preamble", "bundle_dir", "reports", "decision", "error", "failures")
+TOKENS = (
+    "preamble",
+    "bundle_dir",
+    "reports",
+    "decision",
+    "error",
+    "failures",
+    "accepted",
+    "eligible",
+)
 
 
 def load_prompt(name: str, prompts_dir: Path | None = None) -> str:
