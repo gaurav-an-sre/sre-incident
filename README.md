@@ -113,21 +113,48 @@ not use an agent's confidence or conclusion as its oracle:
 ```sh
 make verify
 make verify-wrong-fix
+make verify-correct-fix
 ```
 
-`verify` writes `out/verification.json`. It runs 200 deterministic shopper
-attempts, derives the real-product S2a boundary matrix from the promotion
-threshold, checks the one-cent S2b boundary directly through both pricing
-implementations and the independent reference pricer, compares every quote
-with the authorized and reference amounts, exercises gateway reconciliation,
-and runs another 200-attempt compressed soak. The latter is a bounded
-no-new-declines/no-new-alerts check; it represents a soak test without
-pretending that real elapsed soak time passed.
+The three runs are the oracle's green frame:
+
+```text
+make verify               unfixed        verified=False  failed=[S1, S2a, S2b, S3, S6]
+make verify-wrong-fix     plausible fix  verified=False  failed=[S2b, S3, S5]
+make verify-correct-fix   real fix       verified=True   failed=[]
+```
+
+All three runs keep the promotion active. `verify` writes
+`out/verification.json`; the correct-fix and wrong-fix helpers write their
+corresponding artifacts beside it. The verifier does not use an agent's claim,
+confidence, or conclusion as its oracle. Its seven independent signals are:
+
+* **S1 — recovery:** 200 deterministic attempts recover to at least 99%
+  success.
+* **S2a — boundary through the real API:** real-product carts cover the
+  largest constructible below-threshold subtotal, the exact threshold, and
+  three above-threshold subtotals.
+* **S2b — boundary pricing functions:** direct checks at 9998, 9999, 10000,
+  and 10001 cents agree across quote, authorization, and reference pricing.
+* **S3 — charged equals quoted and reference:** every authorized amount equals
+  both the customer quote and the independent reference amount.
+* **S4 — promotion honoured:** qualifying quotes still show free shipping.
+* **S5 — reconciliation still bites:** undercharges and overcharges decline,
+  while matching amounts approve.
+* **S6 — no recurrence:** another 200-attempt compressed soak has no declines
+  and creates no new alert.
+
+The plausible middle case matters because it passes every signal asking
+“did the errors stop?” (S1, S2a, S4, and S6), but fails every signal asking
+“is the money right?” (S2b, S3, and S5). `verify/reference.py` is deliberately
+independent: it does not import `checkout_svc` or `payments`.
 
 `make verify-wrong-fix` applies `fixtures/wrong_fix.patch` only to a scratch
 candidate. That plausible gateway change restores apparent recovery while
-silently overcharging qualifying customers, so S3 rejects it even though the
-other recovery signals pass.
+silently overcharging qualifying customers, so the money signals reject it
+even though the other recovery signals pass. `make verify-correct-fix` applies
+the genuine authorization-pricing fix only to a scratch candidate and
+demonstrates that the same oracle can accept a correct fix.
 
 After an adjudicated investigation, remediation can be requested with:
 
@@ -142,6 +169,9 @@ claim separately from verification. Publish dry-run renders
 investigation, remediation, and verification artifacts. Live publication
 requires `NOTION_TOKEN` and an explicit `--parent-page`; neither is needed for
 dry-run mode.
+
+See [DEMO.md](DEMO.md) for the presenter script, measured timing notes, and a
+reset recipe for running the demonstration again.
 
 ## Quality checks
 
